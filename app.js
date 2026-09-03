@@ -220,19 +220,52 @@ function setToggle(btn, on) {
   btn.textContent = on ? "On" : "Off";
 }
 
-async function decodeDataUri(ctx, dataUri) {
-  const res = await fetch(dataUri);
-  const arr = await res.arrayBuffer();
-  return ctx.decodeAudioData(arr.slice(0));
-}
-
-async function ensureAudio() {
+function unlockAudio() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     masterGain = audioCtx.createGain();
     masterGain.gain.value = 1;
     masterGain.connect(audioCtx.destination);
   }
+  if (audioCtx.state !== "running") audioCtx.resume();
+  try {
+    const osc = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    osc.frequency.value = 880;
+    g.gain.value = 0.04;
+    osc.connect(g).connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.05);
+  } catch {
+    /* ignore */
+  }
+  const el = document.getElementById("unlockAudio");
+  if (el) {
+    try {
+      el.currentTime = 0;
+      const play = el.play();
+      if (play && play.catch) play.catch(() => {});
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+function decodeDataUri(ctx, dataUri) {
+  return fetch(dataUri)
+    .then((res) => res.arrayBuffer())
+    .then(
+      (arr) =>
+        new Promise((resolve, reject) => {
+          const copy = arr.slice(0);
+          const ret = ctx.decodeAudioData(copy, resolve, reject);
+          if (ret && typeof ret.then === "function") ret.then(resolve, reject);
+        })
+    );
+}
+
+async function ensureAudio() {
+  unlockAudio();
   if (audioCtx.state === "suspended") await audioCtx.resume();
   if (Object.keys(buffers).length) return;
 
@@ -312,8 +345,8 @@ async function start() {
   els.start.textContent = "Stop";
   els.start.classList.add("running");
   setStatus("Playing");
-  await requestWakeLock();
   schedulerTick();
+  requestWakeLock();
   timerId = window.setInterval(schedulerTick, LOOKAHEAD_MS);
 }
 
@@ -334,8 +367,16 @@ function stop() {
 }
 
 els.start.addEventListener("click", async () => {
-  if (running) stop();
-  else await start();
+  if (running) {
+    stop();
+    return;
+  }
+  unlockAudio();
+  await start();
+});
+
+["touchstart", "pointerdown"].forEach((ev) => {
+  window.addEventListener(ev, unlockAudio, { once: true, passive: true });
 });
 
 els.bpm.addEventListener("input", (e) => setBpm(Number(e.target.value)));
@@ -412,6 +453,11 @@ document.addEventListener("visibilitychange", () => {
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("./sw.js").catch(() => {});
+}
+
+const unlockEl = document.getElementById("unlockAudio");
+if (unlockEl && window.CLICK_SAMPLES && window.CLICK_SAMPLES.softwood) {
+  unlockEl.src = window.CLICK_SAMPLES.softwood;
 }
 
 loadSettings();
