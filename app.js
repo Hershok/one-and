@@ -25,7 +25,7 @@ const settings = {
   bpm: 80,
   meter: 4,
   subdivision: 2,
-  click: true,
+  click: false,
   voice: true,
   parts: "both",
 };
@@ -147,10 +147,31 @@ function showLabel(label, atStep) {
   setStatus("Playing");
 }
 
+function voiceAllowed() {
+  return settings.bpm <= 120;
+}
+
+function clickAllowed() {
+  return settings.click || settings.bpm > 120;
+}
+
+function applyTempoRules() {
+  if (settings.bpm > 120 && !settings.click) {
+    settings.click = true;
+    setToggle(els.clickToggle, true);
+  }
+  if (settings.bpm <= 120 && settings.click && settings._autoClick) {
+    settings.click = false;
+    setToggle(els.clickToggle, false);
+  }
+  settings._autoClick = settings.bpm > 120;
+}
+
 function setBpm(value) {
   settings.bpm = Math.min(MAX_BPM, Math.max(MIN_BPM, value));
   els.bpm.value = String(settings.bpm);
   els.bpmRead.textContent = String(settings.bpm);
+  applyTempoRules();
   saveSettings();
 }
 
@@ -166,8 +187,8 @@ function loadSettings() {
       settings.bpm = parsed.bpm ?? settings.bpm;
       settings.meter = parsed.meter ?? settings.meter;
       settings.subdivision = parsed.subdivision ?? settings.subdivision;
-      settings.click = parsed.click ?? settings.click;
-      settings.voice = parsed.voice ?? settings.voice;
+      settings.click = false;
+      settings.voice = parsed.voice ?? true;
       settings.parts = parsed.parts ?? settings.parts;
     }
   } catch {
@@ -180,6 +201,7 @@ function loadSettings() {
   syncSeg(els.partsSeg, "[data-parts]", settings.parts);
   setToggle(els.clickToggle, settings.click);
   setToggle(els.voiceToggle, settings.voice);
+  applyTempoRules();
   updateSubline();
   buildBoard();
 }
@@ -242,13 +264,7 @@ function playClick(time, label, accent) {
 }
 
 function playVoice(label, time) {
-  const buffer = buffers[voiceKey(label)];
-  const stepDur = 60 / settings.bpm / settings.subdivision;
-  let rate = 1;
-  if (buffer && buffer.duration > stepDur * 0.92) {
-    rate = Math.min(1.65, buffer.duration / (stepDur * 0.9));
-  }
-  playBuffer(buffer, time, VOICE_GAIN, rate);
+  playBuffer(buffers[voiceKey(label)], time, VOICE_GAIN, 1);
 }
 
 function schedulerTick() {
@@ -258,8 +274,8 @@ function schedulerTick() {
     const label = labelFor(step);
     const t = nextTime;
     const play = shouldPlay(label);
-    if (play && settings.click) playClick(t, label, isBarOne(step) && isDownLabel(label));
-    if (play && settings.voice) playVoice(label, t);
+    if (play && clickAllowed()) playClick(t, label, isBarOne(step) && isDownLabel(label));
+    if (play && settings.voice && voiceAllowed()) playVoice(label, t);
     const wait = Math.max(0, (t - audioCtx.currentTime) * 1000);
     const captured = label;
     const capturedStep = step;
@@ -351,15 +367,15 @@ els.partsSeg.addEventListener("click", (e) => {
   saveSettings();
 });
 
-els.clickSoundSeg.addEventListener("click", (e) => {
-  const btn = e.target.closest("[data-csound]");
-  if (!btn) return;
-  settings.clickSound = btn.dataset.csound;
-  saveSettings();
-});
 
 els.clickToggle.addEventListener("click", () => {
+  if (settings.bpm > 120) {
+    settings.click = true;
+    setToggle(els.clickToggle, true);
+    return;
+  }
   settings.click = !settings.click;
+  settings._autoClick = false;
   setToggle(els.clickToggle, settings.click);
   saveSettings();
 });
