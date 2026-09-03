@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111111" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="One &" />
+  <title>One &</title>
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+  <link rel="icon" href="./icons/icon-192.png" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="wrap">
+    <div class="brand">
+      <span>One &amp;</span>
+      <span class="status" id="status">Ready</span>
+    </div>
+
+    <section class="display" id="display">
+      <div class="count" id="count">1</div>
+      <div class="subline" id="subline">4/4 · eighths</div>
+    </section>
+
+    <div class="bpm-row">
+      <button class="bpm-btn" id="bpmDown" aria-label="Slower">−</button>
+      <div class="bpm-read">
+        <div class="bpm-number" id="bpmRead">80</div>
+        <div class="bpm-label">BPM</div>
+      </div>
+      <button class="bpm-btn" id="bpmUp" aria-label="Faster">+</button>
+    </div>
+    <input id="bpm" type="range" min="30" max="200" value="80" />
+
+    <div class="grid">
+      <div class="field">
+        <label>Meter</label>
+        <div class="seg" id="meterSeg">
+          <button data-meter="4" class="on">4/4</button>
+          <button data-meter="3">3/4</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Count</label>
+        <div class="seg" id="subSeg">
+          <button data-sub="2" class="on">1 &amp;</button>
+          <button data-sub="4">1 e &amp; a</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Click</label>
+        <button class="toggle on" id="clickToggle">On</button>
+      </div>
+      <div class="field">
+        <label>Voice</label>
+        <button class="toggle on" id="voiceToggle">On</button>
+      </div>
+      <div class="field" style="grid-column: 1 / -1">
+        <label>Count-in</label>
+        <div class="seg" id="countInSeg">
+          <button data-countin="off">Off</button>
+          <button data-countin="short" class="on">3 &amp; 4 &amp;</button>
+          <button data-countin="bars">2 bars</button>
+        </div>
+      </div>
+    </div>
+
+    <button class="start" id="start">Start</button>
+    <p class="hint">On iPhone: open this page in Safari, tap Share, then Add to Home Screen. Keep the app in the foreground while it counts.</p>
+  </main>
+  <script src="./app.js"></script>
+</body>
+</html>
