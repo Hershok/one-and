@@ -1,20 +1,14 @@
-const CACHE = "one-and-v1";
+const CACHE = "one-and-v2";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./voices.js",
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
-  "./icons/apple-touch-icon.png",
-  "./audio/one.mp3",
-  "./audio/two.mp3",
-  "./audio/three.mp3",
-  "./audio/four.mp3",
-  "./audio/and.mp3",
-  "./audio/ee.mp3",
-  "./audio/uh.mp3"
+  "./icons/apple-touch-icon.png"
 ];
 
 self.addEventListener("install", (event) => {

@@ -21,7 +21,7 @@
     </div>
 
     <section class="display" id="display">
-      <div class="count" id="count">1</div>
+      <div class="beat-board" id="beatBoard"></div>
       <div class="subline" id="subline">4/4 · eighths</div>
     </section>
 
@@ -58,19 +58,12 @@
         <label>Voice</label>
         <button class="toggle on" id="voiceToggle">On</button>
       </div>
-      <div class="field" style="grid-column: 1 / -1">
-        <label>Count-in</label>
-        <div class="seg" id="countInSeg">
-          <button data-countin="off">Off</button>
-          <button data-countin="short" class="on">3 &amp; 4 &amp;</button>
-          <button data-countin="bars">2 bars</button>
-        </div>
-      </div>
     </div>
 
     <button class="start" id="start">Start</button>
     <p class="hint">On iPhone: open this page in Safari, tap Share, then Add to Home Screen. Keep the app in the foreground while it counts.</p>
   </main>
+  <script src="./voices.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>
