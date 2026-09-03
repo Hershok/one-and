@@ -3,7 +3,7 @@ const MAX_BPM = 200;
 const LOOKAHEAD_MS = 25;
 const SCHEDULE_AHEAD = 0.12;
 const VOICE_GAIN = 0.9; // 25% below the previous 1.2
-const CLICK_GAIN = 0.9;
+const CLICK_GAIN = 1.08;
 
 const els = {
   status: document.getElementById("status"),
@@ -156,9 +156,11 @@ function clickAllowed() {
 }
 
 function applyTempoRules() {
-  if (settings.bpm > 120 && !settings.click) {
+  if (settings.bpm > 120) {
     settings.click = true;
+    settings.voice = false;
     setToggle(els.clickToggle, true);
+    setToggle(els.voiceToggle, false);
   }
   if (settings.bpm <= 120 && settings.click && settings._autoClick) {
     settings.click = false;
@@ -257,8 +259,8 @@ function playBuffer(buffer, time, gainVal, rate) {
 }
 
 function playClick(time, label, accent) {
-  let name = "wood";
-  if (isDownLabel(label)) name = accent ? "softwood" : "clap";
+  let name = "clap";
+  if (isDownLabel(label)) name = accent ? "softwood" : "thud";
   const buffer = clickBuffers[name] || clickBuffers.wood;
   playBuffer(buffer, time, CLICK_GAIN, 1);
 }
@@ -371,18 +373,36 @@ els.partsSeg.addEventListener("click", (e) => {
 els.clickToggle.addEventListener("click", () => {
   if (settings.bpm > 120) {
     settings.click = true;
+    settings.voice = false;
     setToggle(els.clickToggle, true);
+    setToggle(els.voiceToggle, false);
+    saveSettings();
     return;
   }
   settings.click = !settings.click;
-  settings._autoClick = false;
+  if (settings.click) settings.voice = false;
+  settings._autoClick = settings.bpm > 120;
   setToggle(els.clickToggle, settings.click);
+  setToggle(els.voiceToggle, settings.voice);
   saveSettings();
 });
 
 els.voiceToggle.addEventListener("click", () => {
+  if (settings.bpm > 120) {
+    settings.voice = false;
+    settings.click = true;
+    setToggle(els.voiceToggle, false);
+    setToggle(els.clickToggle, true);
+    saveSettings();
+    return;
+  }
   settings.voice = !settings.voice;
+  if (settings.voice) {
+    settings.click = false;
+    settings._autoClick = false;
+  }
   setToggle(els.voiceToggle, settings.voice);
+  setToggle(els.clickToggle, settings.click);
   saveSettings();
 });
 
