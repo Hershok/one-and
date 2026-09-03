@@ -1,4 +1,4 @@
-const CACHE = "one-and-v8";
+const CACHE = "one-and-v9";
 const ASSETS = [
   "./",
   "./index.html",

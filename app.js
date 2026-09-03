@@ -190,7 +190,7 @@ function loadSettings() {
       settings.meter = parsed.meter ?? settings.meter;
       settings.subdivision = parsed.subdivision ?? settings.subdivision;
       settings.click = false;
-      settings.voice = parsed.voice ?? true;
+      settings.voice = true;
       settings.parts = parsed.parts ?? settings.parts;
     }
   } catch {
