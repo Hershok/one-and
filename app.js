@@ -2,10 +2,11 @@ const MIN_BPM = 30;
 const MAX_BPM = 200;
 const LOOKAHEAD_MS = 25;
 const SCHEDULE_AHEAD = 0.12;
+const VOICE_GAIN = 0.9; // 25% below the previous 1.2
+const CLICK_GAIN = 0.9;
 
 const els = {
   status: document.getElementById("status"),
-  display: document.getElementById("display"),
   beatBoard: document.getElementById("beatBoard"),
   subline: document.getElementById("subline"),
   bpm: document.getElementById("bpm"),
@@ -16,6 +17,7 @@ const els = {
   subSeg: document.getElementById("subSeg"),
   clickToggle: document.getElementById("clickToggle"),
   voiceToggle: document.getElementById("voiceToggle"),
+  partsSeg: document.getElementById("partsSeg"),
   start: document.getElementById("start"),
 };
 
@@ -25,11 +27,13 @@ const settings = {
   subdivision: 2,
   click: true,
   voice: true,
+  parts: "both",
 };
 
 let audioCtx = null;
 let masterGain = null;
 let buffers = {};
+let clickBuffers = {};
 let timerId = null;
 let running = false;
 let nextTime = 0;
@@ -52,10 +56,18 @@ function labelFor(globalStep) {
   return [num, "e", "&", "a"][part];
 }
 
-function isDownbeat(globalStep) {
-  const perBar = stepsPerBar();
-  const stepInBar = ((globalStep % perBar) + perBar) % perBar;
-  return stepInBar % settings.subdivision === 0;
+function isDownLabel(label) {
+  return /^[1-4]$/.test(label);
+}
+
+function isUpLabel(label) {
+  return label === "&" || label === "e" || label === "a";
+}
+
+function shouldPlay(label) {
+  if (settings.parts === "down") return isDownLabel(label);
+  if (settings.parts === "up") return isUpLabel(label);
+  return true;
 }
 
 function isBarOne(globalStep) {
@@ -91,7 +103,6 @@ function buildBoard() {
   els.beatBoard.innerHTML = "";
   numEls = [];
   andEls = [];
-
   for (let i = 0; i < cols; i += 1) {
     const cell = document.createElement("div");
     cell.className = "syll and";
@@ -119,7 +130,11 @@ function clearActive() {
 
 function showLabel(label, atStep) {
   clearActive();
-  if (/^[1-4]$/.test(label)) {
+  if (!shouldPlay(label)) {
+    setStatus("Playing");
+    return;
+  }
+  if (isDownLabel(label)) {
     const el = numEls[Number(label) - 1];
     if (el) el.classList.add("on");
   } else if (label === "&") {
@@ -153,6 +168,7 @@ function loadSettings() {
       settings.subdivision = parsed.subdivision ?? settings.subdivision;
       settings.click = parsed.click ?? settings.click;
       settings.voice = parsed.voice ?? settings.voice;
+      settings.parts = parsed.parts ?? settings.parts;
     }
   } catch {
     /* ignore */
@@ -161,6 +177,7 @@ function loadSettings() {
   els.bpmRead.textContent = String(settings.bpm);
   syncSeg(els.meterSeg, "[data-meter]", String(settings.meter));
   syncSeg(els.subSeg, "[data-sub]", String(settings.subdivision));
+  syncSeg(els.partsSeg, "[data-parts]", settings.parts);
   setToggle(els.clickToggle, settings.click);
   setToggle(els.voiceToggle, settings.voice);
   updateSubline();
@@ -196,49 +213,42 @@ async function ensureAudio() {
   if (Object.keys(buffers).length) return;
 
   const samples = window.VOICE_SAMPLES || {};
-  const names = ["one", "two", "three", "four", "and", "ee", "uh"];
-  for (const name of names) {
+  for (const name of ["one", "two", "three", "four", "and", "ee", "uh"]) {
     if (!samples[name]) throw new Error(`Missing sample ${name}`);
     buffers[name] = await decodeDataUri(audioCtx, samples[name]);
   }
-}
-
-function playClick(time, accent) {
-  const dest = masterGain || audioCtx.destination;
-  const makeTick = (freq, gainVal, dur) => {
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = "square";
-    osc.frequency.setValueAtTime(freq, time);
-    gain.gain.setValueAtTime(gainVal, time);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + dur);
-    osc.connect(gain).connect(dest);
-    osc.start(time);
-    osc.stop(time + dur);
-  };
-  if (accent) {
-    makeTick(1760, 0.28, 0.07);
-    makeTick(880, 0.16, 0.05);
-  } else {
-    makeTick(980, 0.18, 0.045);
+  const clicks = window.CLICK_SAMPLES || {};
+  for (const name of Object.keys(clicks)) {
+    clickBuffers[name] = await decodeDataUri(audioCtx, clicks[name]);
   }
 }
 
-function playVoice(label, time) {
-  const key = voiceKey(label);
-  const buffer = buffers[key];
+function playBuffer(buffer, time, gainVal, rate) {
   if (!buffer) return;
   const src = audioCtx.createBufferSource();
   const gain = audioCtx.createGain();
   src.buffer = buffer;
-  const stepDur = 60 / settings.bpm / settings.subdivision;
-  if (buffer.duration > stepDur * 0.92) {
-    src.playbackRate.value = Math.min(1.65, buffer.duration / (stepDur * 0.9));
-  }
-  const lifted = label === "&" || label === "e" || label === "a";
-  gain.gain.setValueAtTime(lifted ? 1.35 : 1.2, time);
+  src.playbackRate.value = rate || 1;
+  gain.gain.setValueAtTime(gainVal, time);
   src.connect(gain).connect(masterGain || audioCtx.destination);
   src.start(time);
+}
+
+function playClick(time, label, accent) {
+  let name = "wood";
+  if (isDownLabel(label)) name = accent ? "softwood" : "clap";
+  const buffer = clickBuffers[name] || clickBuffers.wood;
+  playBuffer(buffer, time, CLICK_GAIN, 1);
+}
+
+function playVoice(label, time) {
+  const buffer = buffers[voiceKey(label)];
+  const stepDur = 60 / settings.bpm / settings.subdivision;
+  let rate = 1;
+  if (buffer && buffer.duration > stepDur * 0.92) {
+    rate = Math.min(1.65, buffer.duration / (stepDur * 0.9));
+  }
+  playBuffer(buffer, time, VOICE_GAIN, rate);
 }
 
 function schedulerTick() {
@@ -247,8 +257,9 @@ function schedulerTick() {
   while (nextTime < audioCtx.currentTime + SCHEDULE_AHEAD) {
     const label = labelFor(step);
     const t = nextTime;
-    if (settings.click && isDownbeat(step)) playClick(t, isBarOne(step));
-    if (settings.voice) playVoice(label, t);
+    const play = shouldPlay(label);
+    if (play && settings.click) playClick(t, label, isBarOne(step) && isDownLabel(label));
+    if (play && settings.voice) playVoice(label, t);
     const wait = Math.max(0, (t - audioCtx.currentTime) * 1000);
     const captured = label;
     const capturedStep = step;
@@ -272,7 +283,7 @@ async function start() {
   try {
     await ensureAudio();
   } catch (err) {
-    setStatus("Voice failed to load");
+    setStatus("Audio failed to load");
     console.error(err);
     return;
   }
@@ -329,6 +340,21 @@ els.subSeg.addEventListener("click", (e) => {
   settings.subdivision = Number(btn.dataset.sub);
   syncSeg(els.subSeg, "[data-sub]", btn.dataset.sub);
   updateSubline();
+  saveSettings();
+});
+
+els.partsSeg.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-parts]");
+  if (!btn) return;
+  settings.parts = btn.dataset.parts;
+  syncSeg(els.partsSeg, "[data-parts]", settings.parts);
+  saveSettings();
+});
+
+els.clickSoundSeg.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-csound]");
+  if (!btn) return;
+  settings.clickSound = btn.dataset.csound;
   saveSettings();
 });
 
