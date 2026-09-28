@@ -18,6 +18,10 @@ const els = {
   clickToggle: document.getElementById("clickToggle"),
   voiceToggle: document.getElementById("voiceToggle"),
   partsSeg: document.getElementById("partsSeg"),
+  downVol: document.getElementById("downVol"),
+  upVol: document.getElementById("upVol"),
+  downVolRead: document.getElementById("downVolRead"),
+  upVolRead: document.getElementById("upVolRead"),
   start: document.getElementById("start"),
 };
 
@@ -28,6 +32,8 @@ const settings = {
   click: false,
   voice: true,
   parts: "both",
+  downVol: 100,
+  upVol: 70,
 };
 
 let audioCtx = null;
@@ -192,6 +198,8 @@ function loadSettings() {
       settings.click = false;
       settings.voice = true;
       settings.parts = parsed.parts ?? settings.parts;
+      settings.downVol = parsed.downVol ?? settings.downVol;
+      settings.upVol = parsed.upVol ?? settings.upVol;
     }
   } catch {
     /* ignore */
@@ -203,6 +211,7 @@ function loadSettings() {
   syncSeg(els.partsSeg, "[data-parts]", settings.parts);
   setToggle(els.clickToggle, settings.click);
   setToggle(els.voiceToggle, settings.voice);
+  setVolUI();
   applyTempoRules();
   updateSubline();
   buildBoard();
@@ -218,6 +227,18 @@ function syncSeg(root, selector, value) {
 function setToggle(btn, on) {
   btn.classList.toggle("on", on);
   btn.textContent = on ? "On" : "Off";
+}
+
+function setVolUI() {
+  els.downVol.value = String(settings.downVol);
+  els.upVol.value = String(settings.upVol);
+  els.downVolRead.textContent = String(settings.downVol);
+  els.upVolRead.textContent = String(settings.upVol);
+}
+
+function partGain(label) {
+  const pct = isUpLabel(label) ? settings.upVol : settings.downVol;
+  return pct / 100;
 }
 
 function unlockAudio() {
@@ -295,11 +316,11 @@ function playClick(time, label, accent) {
   let name = "clap";
   if (isDownLabel(label)) name = accent ? "softwood" : "thud";
   const buffer = clickBuffers[name] || clickBuffers.wood;
-  playBuffer(buffer, time, CLICK_GAIN, 1);
+  playBuffer(buffer, time, CLICK_GAIN * partGain(label), 1);
 }
 
 function playVoice(label, time) {
-  playBuffer(buffers[voiceKey(label)], time, VOICE_GAIN, 1);
+  playBuffer(buffers[voiceKey(label)], time, VOICE_GAIN * partGain(label), 1);
 }
 
 function schedulerTick() {
@@ -407,6 +428,18 @@ els.partsSeg.addEventListener("click", (e) => {
   if (!btn) return;
   settings.parts = btn.dataset.parts;
   syncSeg(els.partsSeg, "[data-parts]", settings.parts);
+  saveSettings();
+});
+
+els.downVol.addEventListener("input", (e) => {
+  settings.downVol = Number(e.target.value);
+  els.downVolRead.textContent = String(settings.downVol);
+  saveSettings();
+});
+
+els.upVol.addEventListener("input", (e) => {
+  settings.upVol = Number(e.target.value);
+  els.upVolRead.textContent = String(settings.upVol);
   saveSettings();
 });
 

@@ -159,6 +159,10 @@ input[type="range"] {
   accent-color: var(--accent);
 }
 
+.field input[type="range"] {
+  margin: 0;
+}
+
 .grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -186,6 +190,10 @@ input[type="range"] {
 .seg {
   display: flex;
   gap: 6px;
+}
+
+.wrap-seg {
+  flex-wrap: wrap;
 }
 
 .seg button {
